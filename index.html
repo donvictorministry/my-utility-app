@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#6200EE">
+  <title>CodePro</title>
+  <!-- Open Graph meta tags -->
+<meta property="og:title" content="CodePro">
+<meta property="og:description" content="A sleek, customizable code editor with unique visual themes.">
+<meta property="og:image" content="https://i.ibb.co/4ZM6CnWw/Screenshot-20260205-192521.png">
+<meta property="og:url" 
+<meta property="og:type" content="website">
+ 
+  <style>
+    /* ===== 1. VARIABLES ===== */
+    :root {
+      --primary: #6200EE;
+      --primary-dark: #3700B3;
+      --secondary: #03DAC6;
+      --bg: #FFFFFF;
+      --surface: #F5F5F5;
+      --text: #000000;
+      --divider: #E0E0E0;
+      --bg-dark: #121212;
+      --surface-dark: #1E1E1E;
+      --text-dark: #E0E0E0;
+      --divider-dark: #2C2C2C;
+    }
+
+    /* ===== 2. BASE STYLES ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+      body {
+      font-family: 'Roboto', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      
+      /* FIX: Use 100dvh so the URL bar doesn't push the nav off screen */
+      height: 100vh; 
+      height: 100dvh; 
+      
+      display: flex;
+      flex-direction: column;
+    
+    }
+
+    body.dark {
+      --bg: var(--bg-dark);
+      --surface: var(--surface-dark);
+      --text: var(--text-dark);
+      --divider: var(--divider-dark);
+    }
+
+    /* ===== 3. TOP BAR ===== */
+    .top-bar {
+      background: var(--primary);
+      color: white;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+
+    .menu-btn, .action-btn {
+      width: 48px;
+      height: 48px;
+      border: none;
+      background: transparent;
+      color: white;
+      border-radius: 50%;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .menu-btn:active, .action-btn:active {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .app-title {
+      font-size: 20px;
+      font-weight: 500;
+      flex: 1;
+      margin: 0 12px;
+    }
+
+    /* ===== 4. SIDEBAR ===== */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 280px;
+      height: 100vh;
+      background: var(--surface);
+      box-shadow: 4px 0 12px rgba(0,0,0,0.2);
+      transition: left 0.3s;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar.open {
+      left: 0;
+    }
+
+    .sidebar-header {
+      background: var(--primary);
+      color: white;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .sidebar-item {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--divider);
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .sidebar-item:active {
+      background: var(--divider);
+    }
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      z-index: 150;
+    }
+
+    .backdrop.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ===== 5. MAIN CONTENT ===== */
+    main {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .view {
+      display: none;
+      height: 100%;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    /* ===== 6. EDITOR VIEW ===== */
+    
+    
+    .editor-wrapper {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .code-area {
+      flex: 1;
+      display: flex;
+      position: relative; /* Anchors the floating numbers */
+      overflow: hidden;
+    }
+
+    .line-numbers {
+      /* FIX: Float on top of the text */
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 50px;
+      z-index: 5; /* Sit on top */
+      
+      /* FIX: Opaque background covers the text sliding under it */
+      background: var(--surface); 
+      border-right: 1px solid var(--divider);
+      
+      /* Styling */
+      color: #999;
+      font-family: monospace;
+      font-size: 16px;
+      line-height: 28px;
+      padding-top: 20px;
+      padding-right: 8px;
+      text-align: right;
+      box-sizing: border-box;
+      pointer-events: none; /* Let touches pass through if needed */
+      
+      /* No scrollbars on the numbers themselves */
+      overflow: hidden; 
+      white-space: pre; 
+    }
+
+    .code-input {
+      /* FIX: Fill the whole area */
+      width: 100%;
+      height: 100%;
+      
+      /* FIX: Push text right so it doesn't start hidden */
+      padding: 20px;
+      padding-left: 62px; /* 50px (width) + 12px (gap) */
+      
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-family: monospace;
+      font-size: 16px;
+      line-height: 28px;
+      resize: none;
+      tab-size: 2;
+      
+      /* FIX: Enable scrolling in ALL directions */
+      white-space: pre; 
+      overflow: auto; 
+    }
+    
+
+    /* ===== 7. PREVIEW VIEW ===== */
+   
+
+/* 1. THE MODAL CONTAINER */
+#previewView.active {
+  display: flex;
+  flex-direction: column;
+  position: fixed !important;
+  inset: 0 !important;        /* Forces full width and height to every edge */
+  width: 100vw !important;    /* Forces 100% of the phone width */
+  height: 100dvh !important;  /* Dynamic height to ignore mobile browser bars */
+  z-index: 9999 !important;   /* Sit on top of everything */
+  background: var(--bg);
+  overflow: hidden;           /* Prevents the modal itself from shaking */
+}
+
+/* 2. THE WRAPPER */
+.preview-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;                /* Ensure wrapper takes full container width */
+  overflow: hidden;
+}
+
+/* 3. THE LIVE PREVIEW FRAME */
+.preview-frame {
+  flex: 1;
+  width: 100%;                /* Force iframe to fill the full width */
+  height: 100%;
+  border: none;
+  background: white;
+  
+  /* FIX: Allow BOTH horizontal and vertical scrolling inside the frame */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch; 
+}
+
+/* 4. THE BOUNCY CLOSE BUTTON */
+.close-preview-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #FF5252;
+  color: white;
+  border: 2px solid white;
+  font-size: 20px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10001;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: transform 0.1s;
+}
+
+.close-preview-btn:active {
+  transform: scale(0.9); /* The "Bounce" effect */
+}
+
+/* 5. THE COLLAPSIBLE CONSOLE */
+.console-container {
+  height: 48px; 
+  min-height: 48px;
+  width: 100%;                /* Force console to stay full width */
+  background: #1E1E1E;
+  color: #E0E0E0;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10000;
+}
+
+.console-container.expanded {
+  height: 40vh; /* Expands upward */
+}
+
+.console-header {
+  cursor: pointer;
+  padding: 0 16px;
+  height: 48px;
+  background: #2C2C2C;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  user-select: none;
+}
+
+.console-header::before {
+  content: '▲';
+  margin-right: 8px;
+  font-size: 10px;
+  transition: transform 0.3s;
+  color: #888;
+}
+
+.console-container.expanded .console-header::before {
+  transform: rotate(180deg);
+}
+
+.console-output {
+  flex: 1;
+  overflow: auto; /* Allows scrolling logs in all directions */
+  padding: 12px;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.console-line { padding: 4px 0; word-break: break-word; }
+.console-line.error { color: #FF5252; }
+.console-line.warn { color: #FFB74D; }
+.console-line.info { color: #4FC3F7; }
+
+
+    /* ===== 8. FILES VIEW ===== */
+    .files-list {
+      padding: 16px;
+    }
+
+    .project-header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 32px 24px;
+      margin-bottom: 16px;
+    }
+
+    .project-name {
+      font-size: 28px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .project-stats {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .file-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .file-card:active {
+      background: var(--divider);
+    }
+
+    .file-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .file-info {
+      flex: 1;
+    }
+
+    .file-name {
+      font-weight: 500;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .file-meta {
+      font-size: 14px;
+      color: #999;
+    }
+
+/* ===== 9. NOTEPAD VIEW (FINAL MASTER) ===== */
+
+/* 1. MAIN CONTAINER (Full Screen - Covers Nav Bar) */
+.notepad-wrapper {
+  position: fixed !important;
+  inset: 0 !important;        /* Stretch to all 4 corners */
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;   /* Highest Layer */
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/* 2. HEADER (Menu Left - Title Center - Close Right) */
+/* 1. Apply Blue Background & White Text */
+
+.notepad-header, 
+
+.notepad-stats {
+
+  background: #1877F2 !important; /* Official Facebook Blue */
+
+  color: #ffffff !important;      /* Force White Text */
+
+  border: none !important;        /* Remove borders for a clean look */
+
+}
+
+
+
+/* 2. Ensure all Buttons & Icons inside are White */
+.notepad-header {
+  height: 60px;
+  flex-shrink: 0;
+  background: #1877F2 !important; /* 
+  border-bottom: 1px solid var(--divider);
+  color: var(--text);
+  
+  /* GRID LAYOUT: Guarantees Title is Dead Center */
+  display: grid;
+  grid-template-columns: 50px 1fr 50px; 
+  align-items: center;
+  text-align: center;
+  
+  padding: 0;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 0;
+}
+
+/* 3. TINY CLOSE BUTTON (Top Right) */
+.notepad-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 45px;   /* Size of the × */
+  font-weight: 300;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 4. WRITING PAPER (Clean, No Borders, Formatted) */
+.notepad-textarea {
+  flex: 1; 
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  border-radius: 0;
+  padding: 25px;
+  
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+  overflow-y: auto;
+}
+
+/* TYPOGRAPHY (Required for Sidebar Buttons to work) */
+.notepad-textarea h1 { font-size: 1.6em; font-weight: bold; margin: 0.5em 0; }
+.notepad-textarea h2 { font-size: 1.4em; font-weight: bold; margin: 0.4em 0; }
+.notepad-textarea h3 { font-size: 1.2em; font-weight: bold; margin: 0.3em 0; }
+.notepad-textarea b  { font-weight: bold; }
+.notepad-textarea i  { font-style: italic; }
+.notepad-textarea ul { padding-left: 20px; list-style-type: disc; }
+
+/* Placeholder text support */
+.notepad-textarea:empty:before {
+  content: attr(placeholder);
+  color: #777;
+  pointer-events: none;
+}
+
+/* 5. FOOTER (Timestamp Left - Buttons Right) */
+.notepad-stats {
+  height: 56px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+  padding: 0 16px;
+  
+  display: flex;
+  align-items: center;
+  justify-content: space-between; 
+  
+  font-size: 12px;
+  color: #888;
+  border-radius: 0;
+}
+
+/* Footer Buttons (Undo, Redo, Save) */
+.notepad-stats button {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #ffffff;
+  margin-left: 20px;
+  padding: 0;
+}
+
+/* 6. SIDEBAR (Hidden Off-Screen) */
+.note-sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: var(--surface);
+  z-index: 10000; /* Higher than wrapper */
+  
+  /* Slide Animation */
+  transform: translateX(-100%); 
+  transition: transform 0.3s ease;
+  
+  border-right: 1px solid var(--divider);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* Active State */
+.note-sidebar.active { transform: translateX(0); }
+
+/* Sidebar Buttons */
+.sidebar-btn {
+  background: transparent;
+  border: 1px solid var(--divider);
+  color: var(--text);
+  font-size: 16px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 6px;
+  width: 100%;
+
+}
+    
+    /* ===== 10. SETTINGS VIEW ===== */
+    .settings-list {
+      padding: 16px;
+    }
+
+    .setting-item {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 68px;
+    }
+
+    .setting-label {
+      font-weight: 500;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .setting-desc {
+      font-size: 14px;
+      color: #999;
+    }
+
+    .toggle-switch {
+      width: 56px;
+      height: 32px;
+      background: #ccc;
+      border-radius: 16px;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: left 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .toggle-switch.active {
+      background: var(--primary);
+    }
+
+    .toggle-switch.active::after {
+      left: 26px;
+    }
+
+    /* ===== 11. BOTTOM NAVIGATION ===== */
+    .bottom-nav {
+      /* Change height from 80px to auto so it can grow */
+      height: auto; 
+      
+      /* Add top padding so buttons breathe */
+      padding-top: 12px; 
+      
+      /* Add bottom padding that respects the iPhone Home Bar + 12px extra space */
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      
+      background: var(--surface);
+      border-top: 1px solid var(--divider);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+      z-index: 100;
+    
+    }
+
+    .nav-btn {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border: none;
+      background: transparent;
+      color: #666;
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    .nav-btn.active {
+      color: var(--primary);
+    }
+
+    .nav-btn.run-btn {
+      background: var(--secondary);
+      color: #000;
+      border-radius: 50%;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto;
+      box-shadow: 0 4px 12px rgba(3, 218, 198, 0.4);
+      transform: translateY(-8px);
+    }
+
+    .nav-btn.run-btn:active {
+      transform: translateY(-8px) scale(0.95);
+    }
+
+    .nav-icon {
+      font-size: 28px;
+    }
+
+    .nav-label {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* ===== 12. SNACKBAR ===== */
+    .snackbar {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 96px;
+      background: #323232;
+      color: white;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transform: translateY(200px);
+      transition: transform 0.3s;
+      z-index: 300;
+    }
+
+    .snackbar.show {
+      transform: translateY(0);
+    }
+
+    /* ===== 13. UTILITIES ===== */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="top-bar">
+    <button class="menu-btn" id="menuBtn">☰</button>
+    <h1 class="app-title">CodePro</h1>
+    <button class="action-btn" id="saveBtn">💾</button>
+  </header>
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">📁 Menu</div>
+    <div class="sidebar-item" data-action="new">➕ New Project</div>
+    <div class="sidebar-item" data-action="rename">✏️ Rename Project</div>
+    <div class="sidebar-item" data-action="export">📤 Export Project</div>
+    <div class="sidebar-item" data-action="import">📥 Import Project</div>
+    <div class="sidebar-item" data-action="help">❓ Help</div>
+    <div class="sidebar-item" data-action="about">ℹ️ About</div>
+  </aside>
+
+  <!-- ===== BACKDROP ===== -->
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main>
+    
+    <!-- 1. EDITOR VIEW -->
+    <div class="view active" id="editorView">
+      <div class="editor-wrapper">
+        <div class="code-area">
+          <div class="line-numbers" id="lineNums">1</div>
+          <textarea class="code-input" id="codeInput" spellcheck="false" placeholder="Start coding..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. PREVIEW VIEW -->
+    <div class="view" id="previewView">
+      <button class="close-preview-btn" id="closePreviewBtn">✕</button>
+      <div class="preview-wrapper">
+        <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals"></iframe>
+        <div class="console-container">
+          <div class="console-header">
+            <span>📟 Console</span>
+            <button class="action-btn" id="clearConsoleBtn" style="color: #E0E0E0; width: 36px; height: 36px; font-size: 18px;">🗑</button>
+          </div>
+          <div class="console-output" id="consoleOut"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 3. FILES VIEW -->
+    <div class="view" id="filesView">
+      <div class="project-header">
+        <div class="project-name" id="projectName">My Project</div>
+        <div class="project-stats">📄 3 files • 📝 <span id="lineCount">0</span> lines</div>
+      </div>
+      <div class="files-list">
+        <div class="file-card" data-file="index.html">
+          <div class="file-icon">📄</div>
+          <div class="file-info">
+            <div class="file-name">index.html</div>
+            <div class="file-meta">HTML Document</div>
+          </div>
+        </div>
+        <div class="file-card" data-file="styles.css">
+          <div class="file-icon">🎨</div>
+          <div class="file-info">
+            <div class="file-name">styles.css</div>
+            <div class="file-meta">Stylesheet</div>
+          </div>
+        </div>
+        <div class="file-card" data-file="script.js">
+          <div class="file-icon">⚡</div>
+          <div class="file-info">
+            <div class="file-name">script.js</div>
+            <div class="file-meta">JavaScript</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. NOTEPAD VIEW -->
+    
+<div class="view" id="notepadView">
+      <div class="notepad-wrapper">
+        
+        <div class="notepad-header">
+          <button id="noteMenuBtn" style="background:none; border:none; color:inherit; font-size:24px; cursor:pointer;">&#9776;</button>
+          
+          <span>DVGNotepad</span>
+          
+          <button id="closeNotepadBtn" class="notepad-close-btn">&times;</button>
+        </div>
+
+        <div class="note-sidebar" id="noteSidebar">
+          <div class="sidebar-label">Formatting</div>
+          <button class="sidebar-btn" onclick="format('formatBlock','H1')">H1 Large Heading</button>
+          <button class="sidebar-btn" onclick="format('formatBlock','H2')">H2 Medium Heading</button>
+          <button class="sidebar-btn" onclick="format('bold')"><b>B</b> Bold</button>
+          <button class="sidebar-btn" onclick="format('italic')"><i>I</i> Italic</button>
+          <button class="sidebar-btn" onclick="format('insertUnorderedList')">Bullet List</button>
+          <button class="sidebar-btn" onclick="format('foreColor','#FF5252')"><span style="color:#FF5252; font-weight:bold;">●</span> Red Text</button>
+          
+          <div class="sidebar-label">Actions</div>
+          <button class="sidebar-btn" id="shareNoteBtn">Share Image</button>
+          
+          <hr style="border:0; border-top:1px solid var(--divider); margin:15px 0;">
+          
+          <button class="sidebar-btn" id="howToUseBtn">How to use</button>
+          <button class="sidebar-btn" id="contactDevBtn">Contact Developer</button>
+          <button class="sidebar-btn" id="supportAppBtn">Support the App</button>
+        </div>
+
+        <div class="notepad-textarea" id="notepadInput" contenteditable="true" placeholder="Start writing..."></div>
+
+        <div class="notepad-stats">
+          <span id="lastSavedTime">Last saved: --:--</span>
+          
+          <div style="display: flex; align-items: center;">
+            <button onclick="format('undo')" style="font-size: 14px; font-weight: bold;">UNDO</button>
+            <button onclick="format('redo')" style="font-size: 14px; font-weight: bold;">REDO</button>
+            <button id="saveNoteBtn" style="font-size: 14px; font-weight: bold;">SAVE</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 5. SETTINGS VIEW -->
+    <div class="view" id="settingsView">
+      <div class="settings-list">
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">🌙 Dark Mode</div>
+            <div class="setting-desc">Switch between light and dark theme</div>
+          </div>
+          <div class="toggle-switch" id="themeToggle"></div>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">💾 Auto Save</div>
+            <div class="setting-desc">Automatically save your code as you type</div>
+          </div>
+          <div class="toggle-switch active" id="autoSaveToggle"></div>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">🔢 Line Numbers</div>
+            <div class="setting-desc">Show line numbers in editor</div>
+          </div>
+          <div class="toggle-switch active" id="lineNumToggle"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===== BOTTOM NAVIGATION ===== -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="editor">
+      <div class="nav-icon">⌨️</div>
+      <div class="nav-label">Editor</div>
+    </button>
+    <button class="nav-btn" data-view="files">
+      <div class="nav-icon">📁</div>
+      <div class="nav-label">Files</div>
+    </button>
+    <button class="nav-btn run-btn" id="runBtn">
+      <div class="nav-icon">▶</div>
+    </button>
+    <button class="nav-btn" data-view="notepad">
+      <div class="nav-icon">📝</div>
+      <div class="nav-label">Notes</div>
+    </button>
+ 
+    <button class="nav-btn" data-view="settings">
+      <div class="nav-icon">⚙️</div>
+      <div class="nav-label">Settings</div>
+    </button>
+  </nav>
+
+  <!-- ===== SNACKBAR ===== -->
+  <div class="snackbar" id="snackbar">
+    <div id="snackbarText"></div>
+  </div>
+
+  <!-- ===== HIDDEN FILE INPUT ===== -->
+  <input type="file" id="fileInput" accept=".json" class="hidden">
+
+  <script>
+    // ========== 1. STATE ==========
+    let STATE = {
+      theme: 'light',
+      view: 'editor',
+      currentFile: 'index.html',
+      autoSave: true,
+      lineNumbers: true,
+      project: {
+        name: 'My Project',
+        files: {
+          'index.html': `<!DOCTYPE html>
+<html>
+<head>
+  <title>My App</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Hello Mobile!</h1>
+  <button onclick="greet()">Tap Me</button>
+  <script src="script.js"><\/script>
+</body>
+</html>`,
+          'styles.css': `body {
+  padding: 20px;
+  font-family: system-ui;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+h1 {
+  color: white;
+  font-size: 32px;
+  margin-bottom: 20px;
+}
+
+button {
+  background: #6200EE;
+  color: white;
+  border: none;
+  padding: 16px 32px;
+  font-size: 18px;
+  border-radius: 8px;
+}`,
+          'script.js': `function greet() {
+  const name = prompt("What's your name?");
+  if (name) {
+    alert("Hello " + name + "! 🎉");
+    console.log("Greeted: " + name);
+  }
+}
+
+console.log("CodePro Ready! 🚀");`
+        }
+      },
+      notepad: ''
+    };
+
+    // ========== 2. HELPERS ==========
+    function $(sel) { return document.querySelector(sel); }
+    function $$(sel) { return document.querySelectorAll(sel); }
+
+    function vibrate() {
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function showSnackbar(text) {
+      $('#snackbarText').textContent = text;
+      $('#snackbar').classList.add('show');
+      setTimeout(() => $('#snackbar').classList.remove('show'), 3000);
+    }
+
+    // ========== 3. STORAGE ==========
+    function saveState() {
+      try {
+        localStorage.setItem('codepro_state', JSON.stringify(STATE));
+      } catch (e) {
+        console.error('Save failed:', e);
+      }
+    }
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem('codepro_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          STATE = { ...STATE, ...parsed };
+        }
+      } catch (e) {
+        console.error('Load failed:', e);
+      }
+    }
+
+    // ========== 4. EDITOR FUNCTIONS ==========
+    function updateLineNumbers() {
+      const code = $('#codeInput').value;
+      const lines = code.split('\n').length;
+      $('#lineNums').textContent = Array.from({ length: lines }, (_, i) => i + 1).join('\n');
+      $('#lineCount').textContent = lines;
+    }
+
+    function loadFile() {
+      $('#codeInput').value = STATE.project.files[STATE.currentFile] || '';
+      updateLineNumbers();
+    }
+
+    function saveFile() {
+      STATE.project.files[STATE.currentFile] = $('#codeInput').value;
+      if (STATE.autoSave) saveState();
+    }
+
+    function switchFile(fileName) {
+      vibrate();
+      saveFile();
+      STATE.currentFile = fileName;
+      loadFile();
+      showSnackbar('📄 Opened ' + fileName);
+      switchView('editor');
+    }
+
+    // ========== 5. VIEW SWITCHING ==========
+    function switchView(viewName) {
+      vibrate();
+      STATE.view = viewName;
+      
+      // Special handling for notepad
+      if (viewName === 'notepad') {
+        openNotepadCleanly();
+        return;
+      }
+      
+      $$('.view').forEach(v => v.classList.remove('active'));
+      $(`#${viewName}View`).classList.add('active');
+      
+      $$('.nav-btn:not(.run-btn)').forEach(b => b.classList.remove('active'));
+      const targetBtn = $(`.nav-btn[data-view="${viewName}"]`);
+      if (targetBtn) targetBtn.classList.add('active');
+      
+      saveState();
+    }
+
+    // ========== 6. NOTEPAD OPENER (FIX) ==========
+    function openNotepadCleanly() {
+      const view = document.getElementById('notepadView');
+      const wrapper = document.querySelector('.notepad-wrapper');
+      const sidebar = document.getElementById('noteSidebar');
+
+      // Hide all other views
+      $$('.view').forEach(v => v.classList.remove('active'));
+      
+      // Activate notepad view
+      if (view) {
+          view.style.display = 'block';
+          view.classList.add('active');
+      }
+
+      // Force wrapper to show
+      if (wrapper) {
+          wrapper.style.display = 'flex'; 
+          wrapper.style.visibility = 'visible'; 
+      }
+
+      // Close sidebar by default
+      if (sidebar) {
+          sidebar.classList.remove('active');
+      }
+      
+      // Update nav buttons
+      $$('.nav-btn:not(.run-btn)').forEach(b => b.classList.remove('active'));
+      const noteBtn = $(`.nav-btn[data-view="notepad"]`);
+      if (noteBtn) noteBtn.classList.add('active');
+    }
+
+    // ========== 7. PREVIEW FUNCTIONS ==========
+    function runPreview() {
+      vibrate();
+      saveFile();
+      
+      let html = STATE.project.files['index.html'] || '';
+      const css = STATE.project.files['styles.css'] || '';
+      const js = STATE.project.files['script.js'] || '';
+      
+      clearConsole();
+      logConsole('info', '▶ Running preview...');
+      
+      const cssTag = `<style>${css}</style>`;
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', cssTag + '</head>');
+      } else {
+        html = cssTag + html;
+      }
+
+      const consoleScript = `
+        <script>
+          (function(){
+            const ol=console.log, oe=console.error, ow=console.warn;
+            const send = (t, m) => parent.postMessage({t: t, m: typeof m === 'object' ? JSON.stringify(m) : String(m)}, '*');
+            console.log = (...a) => { send('log', a.join(' ')); ol.apply(console, a); };
+            console.error = (...a) => { send('error', a.join(' ')); oe.apply(console, a); };
+            console.warn = (...a) => { send('warn', a.join(' ')); ow.apply(console, a); };
+            window.onerror = (m) => send('error', 'Error: ' + m);
+          })();
+        <\/script>
+      `;
+
+      const userScript = `<script>try{${js}}catch(e){console.error(e)}<\/script>`;
+      
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', consoleScript + userScript + '</body>');
+      } else {
+        html = html + consoleScript + userScript;
+      }
+      
+      $('#previewFrame').srcdoc = html;
+      
+      setTimeout(() => {
+        logConsole('info', '✅ Preview loaded');
+      }, 500);
+      
+      switchView('preview');
+    }
+
+    function clearConsole() {
+      $('#consoleOut').innerHTML = '';
+    }
+
+    function logConsole(level, msg) {
+      const line = document.createElement('div');
+      line.className = 'console-line ' + level;
+      line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      $('#consoleOut').appendChild(line);
+      $('#consoleOut').scrollTop = $('#consoleOut').scrollHeight;
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data.t === 'log') logConsole('info', e.data.m);
+      if (e.data.t === 'error') logConsole('error', e.data.m);
+      if (e.data.t === 'warn') logConsole('warn', e.data.m);
+    });
+
+    // ========== 8. NOTEPAD CONTROLLER ==========
+    window.format = function(command, value) {
+      document.execCommand(command, false, value);
+      document.getElementById('notepadInput').focus();
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const notepadView = document.getElementById('notepadView');
+      const noteInput   = document.getElementById('notepadInput');
+      const menuBtn     = document.getElementById('noteMenuBtn');
+      const sidebar     = document.getElementById('noteSidebar');
+      const closeBtn    = document.getElementById('closeNotepadBtn');
+      const saveBtn     = document.getElementById('saveNoteBtn');
+      const timeDisplay = document.getElementById('lastSavedTime');
+
+      if (noteInput) {
+        noteInput.innerHTML = localStorage.getItem('dvg_note') || '';
+      }
+
+      if (menuBtn && sidebar) {
+        menuBtn.onclick = () => sidebar.classList.add('active');
+      }
+      
+      if (noteInput && sidebar) {
+        noteInput.onclick = () => sidebar.classList.remove('active');
+      }
+
+      if (closeBtn) {
+    closeBtn.onclick = () => {
+      vibrate();
+      
+      // Hide notepad view
+      notepadView.classList.remove('active');
+      notepadView.style.display = 'none';
+      
+      // Show editor view
+      document.getElementById('editorView').classList.add('active');
+      
+      // Update nav buttons
+      document.querySelectorAll('.nav-btn:not(.run-btn)').forEach(b => b.classList.remove('active'));
+      const editorBtn = document.querySelector('.nav-btn[data-view="editor"]');
+      if (editorBtn) editorBtn.classList.add('active');
+    };
+  }
+
+      if (saveBtn) {
+        saveBtn.onclick = () => {
+          const now = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          
+          localStorage.setItem('dvg_note', noteInput.innerHTML);
+          localStorage.setItem('dvg_note_time', now);
+          
+          if (timeDisplay) timeDisplay.innerText = "Saved: " + now;
+          
+          saveBtn.innerText = "OK";
+          setTimeout(() => saveBtn.innerText = "SAVE", 1000);
+          vibrate();
+        };
+      }
+    });
+
+    // ========== 9. SIDEBAR FUNCTIONS ==========
+    function openSidebar() {
+      vibrate();
+      $('#sidebar').classList.add('open');
+      $('#backdrop').classList.add('visible');
+    }
+
+    function closeSidebar() {
+      $('#sidebar').classList.remove('open');
+      $('#backdrop').classList.remove('visible');
+    }
+
+    // ========== 10. PROJECT ACTIONS ==========
+    function newProject() {
+      vibrate();
+      const name = prompt('Enter project name:');
+      if (!name) return;
+      
+      STATE.project = {
+        name: name,
+        files: {
+          'index.html': '<!DOCTYPE html>\n<html>\n<head>\n  <title>' + name + '</title>\n</head>\n<body>\n  <h1>' + name + '</h1>\n</body>\n</html>',
+          'styles.css': '',
+          'script.js': ''
+        }
+      };
+      
+      STATE.currentFile = 'index.html';
+      loadFile();
+      $('#projectName').textContent = name;
+      saveState();
+      closeSidebar();
+      showSnackbar('✅ Project created: ' + name);
+    }
+
+    function renameProject() {
+      vibrate();
+      const name = prompt('Enter new name:', STATE.project.name);
+      if (!name) return;
+      
+      STATE.project.name = name;
+      $('#projectName').textContent = name;
+      saveState();
+      closeSidebar();
+      showSnackbar('✅ Renamed to: ' + name);
+    }
+
+    function exportProject() {
+      vibrate();
+      const data = {
+        type: 'CodePro',
+        version: '1.0.0',
+        project: STATE.project
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = STATE.project.name + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      closeSidebar();
+      showSnackbar('📤 Project exported');
+    }
+
+    function importProject() {
+      vibrate();
+      $('#fileInput').click();
+      closeSidebar();
+    }
+
+    function handleImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          
+          if (data.type === 'CodePro' && data.project) {
+            STATE.project = data.project;
+            STATE.currentFile = 'index.html';
+            loadFile();
+            $('#projectName').textContent = STATE.project.name;
+            saveState();
+            showSnackbar('✅ Project imported: ' + STATE.project.name);
+          } else {
+            showSnackbar('❌ Invalid file format');
+          }
+        } catch (err) {
+          showSnackbar('❌ Import failed: ' + err.message);
+        }
+      };
+      
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function showHelp() {
+      vibrate();
+      closeSidebar();
+      alert('📖 HOW TO USE CODEPRO\n\n⌨️ EDITOR:\n• Tap to write code\n• Auto-saves as you type\n• Line numbers on the left\n\n▶ RUN BUTTON:\n• Center button in bottom nav\n• Tap to run your code\n• See live preview instantly\n\n📁 FILES:\n• Switch between HTML, CSS, JS\n• Tap any file to edit it\n\n📝 NOTES:\n• Write quick notes and ideas\n• Auto word/character counter\n\n⚙️ SETTINGS:\n• Toggle dark mode\n• Enable/disable features\n\n☰ MENU:\n• Create new projects\n• Export/import projects\n• Rename current project\n\nEnjoy coding! 🚀');
+    }
+
+    function showAbout() {
+      vibrate();
+      closeSidebar();
+      alert('ℹ️ ABOUT CODEPRO\n\n📱 Version: 1.0.0\n🎯 Built for: Mobile Developers\n📅 Year: 2025\n\n✨ FEATURES:\n• Mobile-first design\n• Offline capable\n• Auto-save\n• Live preview\n• Console output\n• Dark mode\n• Notepad\n• Export/Import\n\n🔐 PRIVACY:\n• All data stored locally\n• No tracking or analytics\n• Complete privacy\n\n⚖️ LICENSE:\nMIT License - Free to use\n\n🙏 Thank you for using CodePro!\n\nMade with ❤️ for mobile developers');
+    }
+
+    // ========== 11. THEME TOGGLE ==========
+    function toggleTheme() {
+      vibrate();
+      STATE.theme = STATE.theme === 'dark' ? 'light' : 'dark';
+      document.body.className = STATE.theme === 'dark' ? 'dark' : '';
+      $('#themeToggle').className = STATE.theme === 'dark' ? 'toggle-switch active' : 'toggle-switch';
+      saveState();
+      showSnackbar(STATE.theme === 'dark' ? '🌙 Dark mode enabled' : '☀️ Light mode enabled');
+    }
+
+    function toggleAutoSave() {
+      vibrate();
+      STATE.autoSave = !STATE.autoSave;
+      $('#autoSaveToggle').className = STATE.autoSave ? 'toggle-switch active' : 'toggle-switch';
+      saveState();
+      showSnackbar(STATE.autoSave ? '💾 Auto-save enabled' : '💾 Auto-save disabled');
+    }
+
+    function toggleLineNumbers() {
+      vibrate();
+      STATE.lineNumbers = !STATE.lineNumbers;
+      $('#lineNumToggle').className = STATE.lineNumbers ? 'toggle-switch active' : 'toggle-switch';
+      $('#lineNums').style.display = STATE.lineNumbers ? 'block' : 'none';
+      saveState();
+      showSnackbar(STATE.lineNumbers ? '🔢 Line numbers shown' : '🔢 Line numbers hidden');
+    }
+
+    // ========== 12. EVENT LISTENERS ==========
+    function initEvents() {
+      $('#menuBtn').addEventListener('click', openSidebar);
+      $('#saveBtn').addEventListener('click', () => {
+        vibrate();
+        saveFile();
+        saveState();
+        showSnackbar('💾 Saved!');
+      });
+      
+      $$('.sidebar-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const action = item.dataset.action;
+          if (action === 'new') newProject();
+          else if (action === 'rename') renameProject();
+          else if (action === 'export') exportProject();
+          else if (action === 'import') importProject();
+          else if (action === 'help') showHelp();
+          else if (action === 'about') showAbout();
+        });
+      });
+      
+      $('#backdrop').addEventListener('click', closeSidebar);
+      
+      $$('.nav-btn:not(.run-btn)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const view = btn.dataset.view;
+          if (view) switchView(view);
+        });
+      });
+      
+      $('#runBtn').addEventListener('click', runPreview);
+      
+      let typingTimer;
+      $('#codeInput').addEventListener('input', () => {
+        updateLineNumbers();
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(saveFile, 500);
+      });
+      
+      $('#codeInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = e.target.selectionStart;
+          const end = e.target.selectionEnd;
+          e.target.value = e.target.value.substring(0, start) + '  ' + e.target.value.substring(end);
+          e.target.selectionStart = e.target.selectionEnd = start + 2;
+          updateLineNumbers();
+          saveFile();
+        }
+      });
+      
+      $('#clearConsoleBtn').addEventListener('click', () => {
+        vibrate();
+        clearConsole();
+        showSnackbar('🗑 Console cleared');
+      });
+      
+      $$('.file-card').forEach(card => {
+        card.addEventListener('click', () => {
+          switchFile(card.dataset.file);
+        });
+      });
+      
+      $('#themeToggle').addEventListener('click', toggleTheme);
+      $('#autoSaveToggle').addEventListener('click', toggleAutoSave);
+      $('#lineNumToggle').addEventListener('click', toggleLineNumbers);
+      
+      $('#fileInput').addEventListener('change', handleImport);
+      
+      let lastBackPress = 0;
+      window.addEventListener('popstate', (e) => {
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          return;
+        }
+        lastBackPress = now;
+        e.preventDefault();
+        history.pushState(null, null, location.href);
+        showSnackbar('📱 Tap back again to exit');
+      });
+      
+      window.addEventListener('beforeunload', () => {
+        saveFile();
+        saveState();
+      });
+      
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          saveFile();
+          saveState();
+        }
+      });
+      
+      const codeInput = document.getElementById('codeInput');
+      const lineNums = document.getElementById('lineNums');
+      
+      if (codeInput && lineNums) {
+        codeInput.addEventListener('scroll', () => {
+          lineNums.scrollTop = codeInput.scrollTop;
+        });
+      }
+
+      const closeBtn = document.getElementById('closePreviewBtn');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          vibrate();
+          switchView('editor');
+        });
+      }
+
+      const consoleHead = document.querySelector('.console-header');
+      const consoleBox = document.querySelector('.console-container');
+      if (consoleHead && consoleBox) {
+        consoleHead.addEventListener('click', (e) => {
+          if (e.target.closest('#clearConsoleBtn')) return;
+          vibrate();
+          consoleBox.classList.toggle('expanded');
+        });
+      }
+    }
+
+    // ========== 13. INITIALIZATION ==========
+    function init() {
+      console.log('🚀 Initializing CodePro...');
+      
+      loadState();
+      loadFile();
+      $('#projectName').textContent = STATE.project.name;
+      
+      if (STATE.theme === 'dark') {
+        document.body.classList.add('dark');
+        $('#themeToggle').classList.add('active');
+      }
+      
+      if (!STATE.autoSave) {
+        $('#autoSaveToggle').classList.remove('active');
+      }
+      
+      if (!STATE.lineNumbers) {
+        $('#lineNumToggle').classList.remove('active');
+        $('#lineNums').style.display = 'none';
+      }
+      
+      initEvents();
+      history.pushState(null, null, location.href);
+      
+      console.log('✅ CodePro Ready!');
+      
+      if (!localStorage.getItem('codepro_welcomed')) {
+        setTimeout(() => {
+          showSnackbar('👋 Welcome to CodePro!');
+          localStorage.setItem('codepro_welcomed', 'true');
+        }, 1000);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
